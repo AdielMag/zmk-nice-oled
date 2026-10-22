@@ -854,6 +854,9 @@ static struct zmk_widget_hid_indicators hid_indicators_widget;
 #if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS) && !IS_ENABLED(CONFIG_NICE_EPAPER_ON) &&                   (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
 #include <zmk/hid_indicators.h>
 #include <zmk/events/hid_indicators_changed.h>
+#include <zmk/events/keycode_state_changed.h>
+#include <zmk/hid.h>
+#include <dt-bindings/zmk/modifiers.h>
 #define CAPS_ICON 1
 
 // 9x11 Caps Lock symbol (arrow over a bar)
@@ -862,6 +865,7 @@ static const char *const caps_icon[] = {
     "..#...#..", "..#####..", ".........", "..#####..", "..#####..",
 };
 
+// shown while Caps Lock is on OR Shift is held
 static void draw_caps_icon(lv_obj_t *canvas, const struct status_state *state) {
     if (!state->caps_lock) {
         return;
@@ -887,12 +891,15 @@ static void draw_caps_icon(lv_obj_t *canvas, const struct status_state *state) {
 }
 
 struct caps_status_state {
-    bool caps_lock;
+    bool caps_lock; // Caps Lock LED on, or Shift held
 };
 
 static void caps_status_update_cb(struct caps_status_state state) {
     struct zmk_widget_screen *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        if (widget->state.caps_lock == state.caps_lock) {
+            continue; // nothing changed: skip redraw on every keystroke
+        }
         widget->state.caps_lock = state.caps_lock;
         draw_canvas(widget->obj, widget->cbuf, &widget->state);
     }
@@ -900,13 +907,15 @@ static void caps_status_update_cb(struct caps_status_state state) {
 
 static struct caps_status_state caps_status_get_state(const zmk_event_t *eh) {
     return (struct caps_status_state){
-        .caps_lock = (zmk_hid_indicators_get_current_profile() & 0x02) != 0,
+        .caps_lock = (zmk_hid_indicators_get_current_profile() & 0x02) != 0 ||
+                     (zmk_hid_get_explicit_mods() & (MOD_LSFT | MOD_RSFT)) != 0,
     };
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_caps_status, struct caps_status_state, caps_status_update_cb,
                             caps_status_get_state)
 ZMK_SUBSCRIPTION(widget_caps_status, zmk_hid_indicators_changed);
+ZMK_SUBSCRIPTION(widget_caps_status, zmk_keycode_state_changed);
 #endif
 
 static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
