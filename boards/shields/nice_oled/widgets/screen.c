@@ -587,7 +587,7 @@ static void draw_hid_status(lv_obj_t *canvas, const struct status_state *state) 
     init_label_dsc(&label_time, LVGL_FOREGROUND, DRAW_HID_STATUS_FONTS, DRAW_HID_STATUS_TEXT_ALIGN);
     lv_draw_label_dsc_t label_layout;
     init_label_dsc(&label_layout, LVGL_FOREGROUND, DRAW_HID_STATUS_FONTS,
-                   DRAW_HID_STATUS_TEXT_ALIGN);
+                   LV_TEXT_ALIGN_CENTER);
     lv_draw_label_dsc_t label_volume;
     init_label_dsc(&label_volume, LVGL_FOREGROUND, DRAW_HID_STATUS_FONTS,
                    DRAW_HID_STATUS_TEXT_ALIGN);
@@ -672,24 +672,7 @@ static void draw_hid_status(lv_obj_t *canvas, const struct status_state *state) 
 #endif
 
     } else {
-        //  Dibuja mensaje "HID not found"
-
-        // Dibujar "HID"
-        lv_txt_get_size(&text_size, "HID", label_time.font, label_time.letter_space,
-                        label_time.line_space, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        lv_canvas_draw_text(canvas, hid_area_x, current_y, hid_area_width, &label_time, "HID");
-        current_y += text_size.y + line_gap;
-
-        // Dibujar "not"
-        lv_txt_get_size(&text_size, "not", label_layout.font, label_layout.letter_space,
-                        label_layout.line_space, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        lv_canvas_draw_text(canvas, hid_area_x, current_y, hid_area_width, &label_layout, "not");
-        current_y += text_size.y + line_gap;
-
-        // Dibujar "found"
-        lv_txt_get_size(&text_size, "found", label_volume.font, label_volume.letter_space,
-                        label_volume.line_space, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        lv_canvas_draw_text(canvas, hid_area_x, current_y, hid_area_width, &label_volume, "found");
+        // lean: draw nothing until the PC helper (zmk-hid-host) connects
     }
 }
 
