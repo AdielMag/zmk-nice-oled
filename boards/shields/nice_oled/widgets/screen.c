@@ -647,9 +647,23 @@ static void draw_hid_status(lv_obj_t *canvas, const struct status_state *state) 
 #else
         snprintf(layout_str, sizeof(layout_str), "L%i", state->layout);
 #endif
+#if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
         lv_canvas_draw_text(canvas, CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_X,
                             CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y,
                             hid_area_width, &label_layout, layout_str);
+#else
+        // 16px font (8px/char). Centred alone; shifted left when the Caps Lock icon is shown.
+        label_layout.font = &pixel_operator_mono_16;
+        label_layout.align = LV_TEXT_ALIGN_LEFT;
+        int lx = (32 - (int)strlen(layout_str) * 8) / 2;
+#if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)
+        if (state->caps_lock) {
+            lx = 2;
+        }
+#endif
+        lv_canvas_draw_text(canvas, lx, CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y, 32,
+                            &label_layout, layout_str);
+#endif
 #endif // CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT
 
         //  Dibujar Volumen
@@ -837,6 +851,64 @@ static struct zmk_widget_hid_indicators hid_indicators_widget;
  * Draw canvas
  **/
 
+#if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS) && !IS_ENABLED(CONFIG_NICE_EPAPER_ON) &&                   (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
+#include <zmk/hid_indicators.h>
+#include <zmk/events/hid_indicators_changed.h>
+#define CAPS_ICON 1
+
+// 9x11 Caps Lock symbol (arrow over a bar)
+static const char *const caps_icon[] = {
+    "....#....", "...###...", "..##.##..", ".##...##.", "##.....##", "###...###",
+    "..#...#..", "..#####..", ".........", "..#####..", "..#####..",
+};
+
+static void draw_caps_icon(lv_obj_t *canvas, const struct status_state *state) {
+    if (!state->caps_lock) {
+        return;
+    }
+    int x0 = 11; // centred when no language is shown
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_RAW_HID) && IS_ENABLED(CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT)
+    if (state->is_connected) {
+        x0 = 21; // to the right of the 2-letter language code
+    }
+#endif
+#ifdef CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y
+    int y0 = CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y + 1;
+#else
+    int y0 = 119;
+#endif
+    for (int y = 0; y < ARRAY_SIZE(caps_icon); y++) {
+        for (int x = 0; caps_icon[y][x]; x++) {
+            if (caps_icon[y][x] == '#') {
+                lv_canvas_set_px_color(canvas, x0 + x, y0 + y, LVGL_FOREGROUND);
+            }
+        }
+    }
+}
+
+struct caps_status_state {
+    bool caps_lock;
+};
+
+static void caps_status_update_cb(struct caps_status_state state) {
+    struct zmk_widget_screen *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        widget->state.caps_lock = state.caps_lock;
+        draw_canvas(widget->obj, widget->cbuf, &widget->state);
+    }
+}
+
+static struct caps_status_state caps_status_get_state(const zmk_event_t *eh) {
+    return (struct caps_status_state){
+        .caps_lock = (zmk_hid_indicators_get_current_profile() & 0x02) != 0,
+    };
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_caps_status, struct caps_status_state, caps_status_update_cb,
+                            caps_status_get_state)
+ZMK_SUBSCRIPTION(widget_caps_status, zmk_hid_indicators_changed);
+#endif
+
 static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
     lv_obj_t *canvas = lv_obj_get_child(widget, 0);
 
@@ -872,6 +944,10 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     // Dibuja los modificadores si la nueva Kconfig está habilitada
     draw_mods_status(canvas, state);
 #endif // <-- NUEVO
+
+#ifdef CAPS_ICON
+    draw_caps_icon(canvas, state);
+#endif
 
     // Rotate for horizontal display
     rotate_canvas(canvas, cbuf);
@@ -1108,6 +1184,9 @@ int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
     widget_layer_status_init();
 #endif
     widget_output_status_init();
+#ifdef CAPS_ICON
+    widget_caps_status_init();
+#endif
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_WPM)
     widget_wpm_status_init();
 #endif // IS_ENABLED(CONFIG_NICE_OLED_WIDGET_WPM)

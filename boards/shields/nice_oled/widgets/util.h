@@ -42,6 +42,9 @@ struct status_state {
     uint8_t layer_index;
     const char *layer_label;
     uint8_t wpm[10];
+#if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)
+    bool caps_lock;
+#endif
 #ifdef CONFIG_NICE_OLED_WIDGET_RAW_HID
     bool is_connected;
     uint8_t hour;
