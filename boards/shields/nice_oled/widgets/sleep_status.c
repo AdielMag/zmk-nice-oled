@@ -12,6 +12,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
+#include <zmk/activity.h>
 #include <zmk/events/activity_state_changed.h>
 #include "sleep_status.h"
 
@@ -30,7 +31,7 @@ static void set_sleep_img(struct zmk_widget_sleep_status *widget,
         break;
     case ZMK_ACTIVITY_IDLE:
         LOG_DBG("ACTIVITY EVENT IDLE");
-#if IS_ENABLED(CONFIG_NICE_PERI_VIEW_SHOW_SLEEP_ART_ON_IDLE)
+#if IS_ENABLED(CONFIG_NICE_OLED_SHOW_SLEEP_ART_ON_IDLE)
         lv_obj_clear_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
 #else
         lv_obj_add_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
@@ -38,7 +39,7 @@ static void set_sleep_img(struct zmk_widget_sleep_status *widget,
         break;
     case ZMK_ACTIVITY_SLEEP:
         LOG_DBG("ACTIVITY EVENT SLEEP");
-#if IS_ENABLED(CONFIG_NICE_PERI_VIEW_SHOW_SLEEP_ART_ON_SLEEP)
+#if IS_ENABLED(CONFIG_NICE_OLED_SHOW_SLEEP_ART_ON_SLEEP)
         lv_obj_clear_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
 #else
         lv_obj_add_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
@@ -55,8 +56,12 @@ static void sleep_status_update_cb(struct zmk_activity_state_changed ev) {
 }
 
 static struct zmk_activity_state_changed sleep_status_get_state(const zmk_event_t *eh) {
-    struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
-    return *ev;
+    // eh is NULL on the initial widget update: fall back to the current state
+    const struct zmk_activity_state_changed *ev = eh ? as_zmk_activity_state_changed(eh) : NULL;
+    if (ev) {
+        return *ev;
+    }
+    return (struct zmk_activity_state_changed){.state = zmk_activity_get_state()};
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_sleep_status, struct zmk_activity_state_changed,
@@ -72,12 +77,11 @@ int zmk_widget_sleep_status_init(struct zmk_widget_sleep_status *widget, lv_obj_
 #if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
     lv_img_set_src(widget->art, &vim_68x160);
 #else
-    // lv_img_set_src(widget->art, &sleep_oled);
-    lv_img_set_src(widget->art, &vim_32x128);
+    lv_img_set_src(widget->art, &sleep_oled);
 #endif
     lv_obj_align(widget->art, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    // lv_obj_add_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
 
     widget_sleep_status_init();
     return 0;
