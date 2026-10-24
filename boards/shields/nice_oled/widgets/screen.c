@@ -972,6 +972,18 @@ static void set_battery_status(struct zmk_widget_screen *widget, struct battery_
     widget->state.batteries[state.source].level = state.level;
     widget->state.batteries[state.source].usb_present = state.usb_present;
 
+#if IS_ENABLED(CONFIG_NICE_OLED_SHOW_SLEEP_ART_ON_IDLE) ||                                         \
+    IS_ENABLED(CONFIG_NICE_OLED_SHOW_SLEEP_ART_ON_SLEEP)
+    zmk_widget_sleep_status_set_charging(
+        &sleep_status_widget, widget->state.batteries[0].usb_present,
+#if CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES >= 2
+        widget->state.batteries[1].level == PERIPHERAL_CHARGING_LEVEL
+#else
+        false
+#endif
+    );
+#endif
+
     draw_canvas(widget->obj, widget->cbuf, &widget->state);
 }
 
