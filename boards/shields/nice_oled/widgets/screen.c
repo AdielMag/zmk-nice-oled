@@ -55,139 +55,86 @@ struct battery_state {
     bool usb_present;
 };
 /**
- * @brief Dibuja el estado de la batería como texto "CENTRAL - PERIPHERAL".
+ * Battery block for each half (128x32 OLED, visible canvas area x 0..31, y 32..159):
  *
- * Esta función toma el estado de la batería del central y del periférico
- * y lo muestra como una cadena de texto simple en las coordenadas especificadas.
+ *   L [#######  ]=     <- side letter + battery icon, fill = charge level
+ *       87%            <- percentage ("--" = half not connected)
+ *
+ * While the left half is on USB power (= charging if a battery is fitted) a lightning bolt
+ * is drawn over the icon. The right half can't report USB/charging over split BLE, so it
+ * only shows its level.
  */
-static void draw_battery_text(lv_obj_t *canvas, const struct status_state *state) {
-    // Un buffer de texto más grande para manejar múltiples baterías
-    char text[32] = "";
-    lv_draw_label_dsc_t label_dsc;
+#define BATT_BLOCK_Y0 54 // top of the left block
+#define BATT_BLOCK_H 30  // distance to the right block
 
-    // Inicialización de la fuente y el estilo del texto
-#if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &pixel_operator_mono_16, LV_TEXT_ALIGN_LEFT);
-#else
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
-#endif
+// 7x8 lightning bolt, drawn over the icon (inverted where the fill is)
+static const char *const batt_bolt[] = {
+    "....##.", "...##..", "..##...", ".######", "######.", "...##..", "..##...", ".##....",
+};
 
-    //  Lógica Parcelada
-#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ALL)
-    // MODO 1: Muestra TODAS las baterías (Central + Periféricos) en una sola linea
-    char *p = text;
-    char *end = text + sizeof(text);
-    for (int i = 0; i < CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES; i++) {
-        // Añade el nivel de la batería y un espacio, controlando el tamaño del buffer
-        int written = snprintf(p, end - p, "%d ", state->batteries[i].level);
-        if (written > 0) {
-            p += written;
+static void draw_battery_block(lv_obj_t *canvas, int y0, char side, uint8_t level, bool known,
+                               bool charging) {
+    lv_draw_rect_dsc_t fg, bg;
+    init_rect_dsc(&fg, LVGL_FOREGROUND);
+    init_rect_dsc(&bg, LVGL_BACKGROUND);
+
+    lv_draw_label_dsc_t letter_dsc, pct_dsc;
+    init_label_dsc(&letter_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
+    init_label_dsc(&pct_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
+
+    char letter[2] = {side, '\0'};
+    lv_canvas_draw_text(canvas, 0, y0 + 2, 8, &letter_dsc, letter);
+
+    // icon: body 21x12 at x 9, terminal nub 2x4 at x 30
+    lv_canvas_draw_rect(canvas, 9, y0, 21, 12, &fg);
+    lv_canvas_draw_rect(canvas, 10, y0 + 1, 19, 10, &bg);
+    lv_canvas_draw_rect(canvas, 30, y0 + 4, 2, 4, &fg);
+
+    if (level > 100) {
+        level = 100;
+    }
+    const int fill_x = 11, fill_w_max = 17, fill_y = y0 + 2, fill_h = 8;
+    int fill_w = known ? (level * fill_w_max + 50) / 100 : 0;
+    if (known && level > 0 && fill_w == 0) {
+        fill_w = 1;
+    }
+    if (fill_w > 0) {
+        lv_canvas_draw_rect(canvas, fill_x, fill_y, fill_w, fill_h, &fg);
+    }
+
+    if (charging) {
+        const int bx = fill_x + (fill_w_max - 7) / 2;
+        for (int y = 0; y < ARRAY_SIZE(batt_bolt); y++) {
+            for (int x = 0; batt_bolt[y][x]; x++) {
+                if (batt_bolt[y][x] != '#') {
+                    continue;
+                }
+                bool on_fill = (bx + x) < fill_x + fill_w;
+                lv_canvas_set_px_color(canvas, bx + x, fill_y + y,
+                                       on_fill ? LVGL_BACKGROUND : LVGL_FOREGROUND);
+            }
         }
     }
-    // Elimina el último espacio si se escribió algo
-    if (p > text) {
-        *(p - 1) = '\0';
-    }
 
-#elif IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ONLY)
-    // MODO 2: Muestra SÓLO las baterías de los periféricos
-    char *p = text;
-    char *end = text + sizeof(text);
-    // El bucle empieza en 1 para saltarse la batería central (índice 0)
-    for (int i = 1; i < CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES; i++) {
-        int written = snprintf(p, end - p, "%d  ", state->batteries[i].level);
-        if (written > 0) {
-            p += written;
-        }
-    }
-    if (p > text) {
-        *(p - 1) = '\0';
-    }
-
-#elif IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_AND_CENTRAL)
-    // MODO 3: Muestra la batería central y la del PRIMER periférico
-    if (CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES >= 2) {
-        snprintf(text, sizeof(text), "%d  %d", state->batteries[0].level,
-                 state->batteries[1].level);
+    char text[8];
+    if (known) {
+        snprintf(text, sizeof(text), "%d%%", level);
     } else {
-        // Si no hay periférico, muestra solo la central
-        snprintf(text, sizeof(text), "%d", state->batteries[0].level);
+        snprintf(text, sizeof(text), "--");
     }
-#endif
-
-    // Dibuja la cadena de texto final en la pantalla
-    lv_canvas_draw_text(canvas, 0, 19, lv_obj_get_width(canvas), &label_dsc, text);
+    lv_canvas_draw_text(canvas, 0, y0 + 14, 32, &pct_dsc, text);
 }
-/*
+
 static void draw_battery_text(lv_obj_t *canvas, const struct status_state *state) {
-    lv_draw_label_dsc_t label_dsc;
-
-    // Inicialización de la fuente y el estilo del texto
-#if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &pixel_operator_mono_16, LV_TEXT_ALIGN_LEFT);
-#else
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
-#endif
-
-    //  Lógica Parcelada
-#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ALL)
-    // MODO 1: Muestra TODAS las baterías, en dos líneas separadas.
-
-    //  Batería Central
-    char central_text[8];
-    memset(central_text, 0, sizeof(central_text)); // Limpia el búfer
-    snprintf(central_text, sizeof(central_text), "%d", state->batteries[0].level);
-    lv_canvas_draw_text(canvas, 0, 1, 25, &label_dsc, central_text);
-
-    //  Baterías Periféricas
-    char peripheral_text[32];
-    memset(peripheral_text, 0, sizeof(peripheral_text)); // Limpia el búfer
-    char *p = peripheral_text;
-    char *end = peripheral_text + sizeof(peripheral_text);
-
-    for (int i = 1; i < CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES; i++) {
-        int written = snprintf(p, end - p, "%d ", state->batteries[i].level);
-        if (written > 0) {
-            p += written;
-        }
-    }
-    if (p > peripheral_text) {
-        *(p - 1) = '\0'; // Elimina el último espacio
-    }
-    lv_canvas_draw_text(canvas, 0, 19, lv_obj_get_width(canvas), &label_dsc, peripheral_text);
-
-#else
-    // MODO 2 y 3 (el resto de los casos)
-    char text[32];
-    memset(text, 0, sizeof(text)); // Limpia el búfer
-
-#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ONLY)
-    // Muestra SÓLO las baterías de los periféricos
-    char *p = text;
-    char *end = text + sizeof(text);
-    for (int i = 1; i < CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES; i++) {
-        int written = snprintf(p, end - p, "%d ", state->batteries[i].level);
-        if (written > 0) {
-            p += written;
-        }
-    }
-    if (p > text) {
-        *(p - 1) = '\0';
-    }
-#elif IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_AND_CENTRAL)
-    // Muestra la batería central y la del PRIMER periférico
-    if (CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES >= 2) {
-        snprintf(text, sizeof(text), "%d %d", state->batteries[0].level, state->batteries[1].level);
-    } else {
-        snprintf(text, sizeof(text), "%d", state->batteries[0].level);
-    }
-#endif
-
-    // Dibuja la cadena de texto final para los modos 2 y 3
-    lv_canvas_draw_text(canvas, 0, 19, lv_obj_get_width(canvas), &label_dsc, text);
+    // index 0 = this (left/central) half, 1 = first peripheral (right half)
+    draw_battery_block(canvas, BATT_BLOCK_Y0, 'L', state->batteries[0].level, true,
+                       state->batteries[0].usb_present);
+#if CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES >= 2
+    // peripheral reports 0 until it connects (and again after it disconnects)
+    draw_battery_block(canvas, BATT_BLOCK_Y0 + BATT_BLOCK_H, 'R', state->batteries[1].level,
+                       state->batteries[1].level > 0, false);
 #endif
 }
-*/
 
 //  FIN DE LA SECCIÓN REFACTORIZADA
 #endif
@@ -1041,7 +988,8 @@ static struct battery_state peripheral_battery_status_get_state(const zmk_event_
 #endif
 
 static struct battery_state central_battery_status_get_state(const zmk_event_t *eh) {
-    const struct zmk_battery_state_changed *ev = as_zmk_battery_state_changed(eh);
+    const struct zmk_battery_state_changed *ev =
+        (eh != NULL) ? as_zmk_battery_state_changed(eh) : NULL;
     return (struct battery_state){
         .source = 0,
         .level = (ev != NULL) ? ev->state_of_charge : zmk_battery_state_of_charge(),
@@ -1055,7 +1003,7 @@ static struct battery_state battery_status_get_state(const zmk_event_t *eh) {
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ALL) ||                     \
     IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_ONLY) ||                    \
     IS_ENABLED(CONFIG_NICE_OLED_WIDGET_CENTRAL_SHOW_BATTERY_PERIPHERAL_AND_CENTRAL)
-    if (as_zmk_peripheral_battery_state_changed(eh) != NULL) {
+    if (eh != NULL && as_zmk_peripheral_battery_state_changed(eh) != NULL) {
         return peripheral_battery_status_get_state(eh);
     } else {
         return central_battery_status_get_state(eh);
