@@ -60,10 +60,12 @@ struct battery_state {
  *   L [#######  ]=     <- side letter + battery icon, fill = charge level
  *       87%            <- percentage ("--" = half not connected)
  *
- * While the left half is on USB power (= charging if a battery is fitted) a lightning bolt
- * is drawn over the icon. The right half can't report USB/charging over split BLE, so it
- * only shows its level.
+ * While a half is on USB power (= charging if a battery is fitted) the icon is empty with a
+ * lightning bolt and the text reads "CHG": the voltage-based % is meaningless while the
+ * charger holds the cell at ~4.2 V. The right half signals USB power by reporting the
+ * reserved battery level PERIPHERAL_CHARGING_LEVEL (zmk-config-sofle src/batt_charging.c).
  */
+#define PERIPHERAL_CHARGING_LEVEL 1
 #define BATT_BLOCK_Y0 54 // top of the left block
 #define BATT_BLOCK_H 30  // distance to the right block
 
@@ -94,8 +96,9 @@ static void draw_battery_block(lv_obj_t *canvas, int y0, char side, uint8_t leve
         level = 100;
     }
     const int fill_x = 11, fill_w_max = 17, fill_y = y0 + 2, fill_h = 8;
-    int fill_w = known ? (level * fill_w_max + 50) / 100 : 0;
-    if (known && level > 0 && fill_w == 0) {
+    const bool show_level = known && !charging;
+    int fill_w = show_level ? (level * fill_w_max + 50) / 100 : 0;
+    if (show_level && level > 0 && fill_w == 0) {
         fill_w = 1;
     }
     if (fill_w > 0) {
@@ -117,7 +120,9 @@ static void draw_battery_block(lv_obj_t *canvas, int y0, char side, uint8_t leve
     }
 
     char text[8];
-    if (known) {
+    if (charging) {
+        snprintf(text, sizeof(text), "CHG");
+    } else if (known) {
         snprintf(text, sizeof(text), "%d%%", level);
     } else {
         snprintf(text, sizeof(text), "--");
@@ -132,7 +137,8 @@ static void draw_battery_text(lv_obj_t *canvas, const struct status_state *state
 #if CONFIG_NICE_OLED_SPLIT_TOTAL_DEVICES >= 2
     // peripheral reports 0 until it connects (and again after it disconnects)
     draw_battery_block(canvas, BATT_BLOCK_Y0 + BATT_BLOCK_H, 'R', state->batteries[1].level,
-                       state->batteries[1].level > 0, false);
+                       state->batteries[1].level > 0,
+                       state->batteries[1].level == PERIPHERAL_CHARGING_LEVEL);
 #endif
 }
 
