@@ -20,6 +20,18 @@ config NICE_OLED_CUSTOM_CANVAS_HEIGHT
     int "Custom Canvas Height"
     default 160
 
+config NICE_OLED_LEFT_MARGIN_PERCENT
+    int "Blank margin on the left edge of the horizontal screen, in percent of its width"
+    range 0 30
+    default 0
+    help
+      The whole picture is drawn this much further right, so a bezel/case cutout that hides the
+      left edge of the OLED does not clip it. The same amount falls off the right edge.
+
+config NICE_OLED_DISPLAY_WIDTH
+    int "Visible width of the horizontal OLED, in pixels (used for the left margin)"
+    default 128
+
 config LV_Z_VDB_SIZE
     default 64 if NICE_OLED_ON
     default 100 if NICE_EPAPER_ON
