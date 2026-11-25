@@ -35,8 +35,14 @@ static const lv_img_dsc_t *idle_luna_imgs[] = {&dog_sit1_90, &dog_sit2_90};
  * native display coords (128x32 landscape); the user's "up" is native +x, the user's "left"
  * is native y = 0. Glyphs below are written as the user sees them and rotated when drawn.
  */
-#define CHG_PH 12 // portrait height of the strip (= native width)
-#define CHG_PW 32 // portrait width (= native height)
+/* Visible window (native coords) once the case cutout is accounted for, same numbers as the main
+ * screen margins: native y starts at the left margin, native x ends at the top margin. */
+#define VIS_Y0 (CONFIG_NICE_OLED_DISPLAY_HEIGHT * CONFIG_NICE_OLED_LEFT_MARGIN_PERCENT / 100)
+#define VIS_X1                                                                                         (CONFIG_NICE_OLED_DISPLAY_WIDTH -                                                                   CONFIG_NICE_OLED_DISPLAY_WIDTH * CONFIG_NICE_OLED_TOP_MARGIN_PERCENT / 100)
+#define VIS_W (CONFIG_NICE_OLED_DISPLAY_HEIGHT - VIS_Y0) // visible width in the user's view
+#define CHG_ROW_H 10                                      // one "L<bolt>" row, bolt is 8 tall
+#define CHG_PH (2 * CHG_ROW_H - 1) // portrait height of the strip (= native width): L row + R row
+#define CHG_PW VIS_W               // portrait width (= native height)
 static lv_color_t chg_buf[CHG_PH * CHG_PW];
 
 static const char *const chg_bolt[] = {
@@ -56,9 +62,9 @@ static void chg_glyph(lv_obj_t *canvas, const char *const *rows, int nrows, int 
     }
 }
 
-static void chg_draw_side(lv_obj_t *canvas, const char *const *letter, int px0) {
-    chg_glyph(canvas, letter, 7, px0 + 1, 3);
-    chg_glyph(canvas, chg_bolt, ARRAY_SIZE(chg_bolt), px0 + 8, 2);
+static void chg_draw_side(lv_obj_t *canvas, const char *const *letter, int py0) {
+    chg_glyph(canvas, letter, 7, 1, py0 + 1);
+    chg_glyph(canvas, chg_bolt, ARRAY_SIZE(chg_bolt), 8, py0);
 }
 
 static void chg_redraw(struct zmk_widget_sleep_status *widget) {
@@ -71,10 +77,10 @@ static void chg_redraw(struct zmk_widget_sleep_status *widget) {
     }
     lv_canvas_fill_bg(widget->chg, LVGL_BACKGROUND, LV_OPA_COVER);
     if (widget->chg_left) {
-        chg_draw_side(widget->chg, chg_L, 0);
+        chg_draw_side(widget->chg, chg_L, 0); /* top row (user view) */
     }
     if (widget->chg_right) {
-        chg_draw_side(widget->chg, chg_R, CHG_PW / 2);
+        chg_draw_side(widget->chg, chg_R, CHG_ROW_H); /* row below */
     }
     lv_obj_clear_flag(widget->chg, LV_OBJ_FLAG_HIDDEN);
 }
@@ -161,13 +167,15 @@ int zmk_widget_sleep_status_init(struct zmk_widget_sleep_status *widget, lv_obj_
     lv_animimg_set_src(luna, (const void **)idle_luna_imgs, ARRAY_SIZE(idle_luna_imgs));
     lv_animimg_set_duration(luna, 960);
     lv_animimg_set_repeat_count(luna, LV_ANIM_REPEAT_INFINITE);
-    lv_obj_center(luna);
+    /* sprite is 24 x 32 native; its art covers native y 8..28 (21 rows). Centre that art in the
+     * visible window (VIS_Y0..31 by 0..VIS_X1-1). */
+    lv_obj_align(luna, LV_ALIGN_TOP_LEFT, (VIS_X1 - 24) / 2, VIS_Y0 + (VIS_W - 21) / 2 - 8);
     lv_animimg_start(luna);
 
-    // charging strip at the user's top (native right edge), clear of Luna
+    // charging strip at the user's top (native right edge of the visible window), clear of Luna
     widget->chg = lv_canvas_create(widget->art);
     lv_canvas_set_buffer(widget->chg, chg_buf, CHG_PH, CHG_PW, LV_IMG_CF_TRUE_COLOR);
-    lv_obj_align(widget->chg, LV_ALIGN_TOP_LEFT, 128 - CHG_PH, 0);
+    lv_obj_align(widget->chg, LV_ALIGN_TOP_LEFT, VIS_X1 - CHG_PH, VIS_Y0);
     chg_redraw(widget); // state may have arrived before init
 #endif
 
