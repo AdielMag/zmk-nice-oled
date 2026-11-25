@@ -26,8 +26,21 @@ void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
       CONFIG_NICE_OLED_DISPLAY_HEIGHT * CONFIG_NICE_OLED_TOP_MARGIN_PERCENT / 100;
 
   lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
-  lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1 + left_margin, top_margin,
+  lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1, top_margin,
                       CANVAS_HEIGHT / 2, CANVAS_HEIGHT / 2, false);
+
+  /* The transform offset_x did not shift the picture on the device, so move the already
+   * rotated pixels right by hand (canvas buffer is CANVAS_HEIGHT x CANVAS_HEIGHT, 1 px = 1 lv_color_t). */
+  if (left_margin > 0 && left_margin < CANVAS_HEIGHT) {
+    for (int y = 0; y < CANVAS_HEIGHT; y++) {
+      lv_color_t *row = &cbuf[y * CANVAS_HEIGHT];
+      memmove(row + left_margin, row, (CANVAS_HEIGHT - left_margin) * sizeof(lv_color_t));
+      for (int x = 0; x < left_margin; x++) {
+        row[x] = LVGL_BACKGROUND;
+      }
+    }
+    lv_obj_invalidate(canvas);
+  }
 }
 
 void draw_background(lv_obj_t *canvas) {
