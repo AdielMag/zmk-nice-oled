@@ -22,7 +22,7 @@ config NICE_OLED_CUSTOM_CANVAS_HEIGHT
 
 config NICE_OLED_LEFT_MARGIN_PERCENT
     int "Blank margin on the left edge of the horizontal screen, in percent of its width"
-    range 0 30
+    range 0 90
     default 0
     help
       The whole picture is drawn this much further right, so a bezel/case cutout that hides the
