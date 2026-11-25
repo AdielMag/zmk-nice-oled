@@ -22,8 +22,11 @@ void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
   const int left_margin =
       CONFIG_NICE_OLED_DISPLAY_WIDTH * CONFIG_NICE_OLED_LEFT_MARGIN_PERCENT / 100;
 
+  const int top_margin =
+      CONFIG_NICE_OLED_DISPLAY_HEIGHT * CONFIG_NICE_OLED_TOP_MARGIN_PERCENT / 100;
+
   lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
-  lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1 + left_margin, 0,
+  lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1 + left_margin, top_margin,
                       CANVAS_HEIGHT / 2, CANVAS_HEIGHT / 2, false);
 }
 
