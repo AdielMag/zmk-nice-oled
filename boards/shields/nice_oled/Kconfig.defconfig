@@ -20,6 +20,10 @@ config NICE_OLED_CUSTOM_CANVAS_HEIGHT
     int "Custom Canvas Height"
     default 160
 
+config NICE_OLED_WIDGET_PROFILE_DOTS
+    bool "Show the 5 Bluetooth profile dots at the bottom of the screen"
+    default y
+
 config NICE_OLED_LEFT_MARGIN_PERCENT
     int "Blank margin on the keyboard-view LEFT of the (rotated-mounted) OLED, in percent of its 32 px short axis"
     range 0 90

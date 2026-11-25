@@ -16,7 +16,7 @@ LV_IMG_DECLARE(profile);
 LV_IMG_DECLARE(profile_active);
 #endif
 
-#if !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG)
+#if !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG) && IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_DOTS)
 static void draw_inactive_profiles(lv_obj_t *canvas, const struct status_state *state) {
     /* 5 hollow 3x3 dots on a 4 px pitch (19 px wide) so they fit the 22 px visible width */
     lv_draw_rect_dsc_t fg, bg;
@@ -37,7 +37,7 @@ static void draw_active_profile(lv_obj_t *canvas, const struct status_state *sta
 
     lv_canvas_draw_rect(canvas, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_X + offset, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_Y, 3, 3, &rect_white_dsc);
 }
-#endif // !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG)
+#endif // profile dots
 
 #if !IS_ENABLED(CONFIG_NICE_EPAPER_ON)
 static void draw_active_profile_text(lv_obj_t *canvas, const struct status_state *state) {
@@ -69,7 +69,9 @@ void draw_profile_status(lv_obj_t *canvas, const struct status_state *state) {
                            i == state->active_profile_index ? &profile_active : &profile, &img_dsc);
     }
 #else
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_DOTS)
     draw_inactive_profiles(canvas, state);
     draw_active_profile(canvas, state);
+#endif
 #endif
 }
