@@ -21,19 +21,20 @@ config NICE_OLED_CUSTOM_CANVAS_HEIGHT
     default 160
 
 config NICE_OLED_LEFT_MARGIN_PERCENT
-    int "Blank margin on the left edge of the horizontal screen, in percent of its width"
+    int "Blank margin on the keyboard-view LEFT of the (rotated-mounted) OLED, in percent of its 32 px short axis"
     range 0 90
     default 0
     help
-      The whole picture is drawn this much further right, so a bezel/case cutout that hides the
-      left edge of the OLED does not clip it. The same amount falls off the right edge.
+      The picture is moved this far away from the keyboard-view left edge, so a bezel/case cutout
+      does not clip it. The same amount falls off the opposite edge.
 
 config NICE_OLED_TOP_MARGIN_PERCENT
-    int "Blank margin on the top edge of the horizontal screen, in percent of its height"
+    int "Blank margin on the keyboard-view TOP of the (rotated-mounted) OLED, in percent of its 128 px long axis"
     range 0 30
     default 0
     help
-      The whole picture is drawn this much further down. The same amount falls off the bottom edge.
+      The picture is moved this far down from the keyboard-view top edge. The same amount falls
+      off the bottom edge.
 
 config NICE_OLED_DISPLAY_HEIGHT
     int "Visible height of the horizontal OLED, in pixels (used for the top margin)"
