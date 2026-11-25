@@ -18,17 +18,22 @@ LV_IMG_DECLARE(profile_active);
 
 #if !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG)
 static void draw_inactive_profiles(lv_obj_t *canvas, const struct status_state *state) {
-    lv_draw_img_dsc_t img_dsc;
-    lv_draw_img_dsc_init(&img_dsc);
-
-    lv_canvas_draw_img(canvas, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_X, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_Y, &profiles, &img_dsc);
+    /* 5 hollow 3x3 dots on a 4 px pitch (19 px wide) so they fit the 22 px visible width */
+    lv_draw_rect_dsc_t fg, bg;
+    init_rect_dsc(&fg, LVGL_FOREGROUND);
+    init_rect_dsc(&bg, LVGL_BACKGROUND);
+    for (int i = 0; i < 5; i++) {
+        int x = CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_X + 1 + i * 4;
+        lv_canvas_draw_rect(canvas, x, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_Y, 3, 3, &fg);
+        lv_canvas_draw_rect(canvas, x + 1, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_Y + 1, 1, 1, &bg);
+    }
 }
 
 static void draw_active_profile(lv_obj_t *canvas, const struct status_state *state) {
     lv_draw_rect_dsc_t rect_white_dsc;
     init_rect_dsc(&rect_white_dsc, LVGL_FOREGROUND);
 
-    int offset = state->active_profile_index * 7;
+    int offset = 1 + state->active_profile_index * 4;
 
     lv_canvas_draw_rect(canvas, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_X + offset, CONFIG_NICE_OLED_WIDGET_PROFILE_CUSTOM_Y, 3, 3, &rect_white_dsc);
 }
@@ -49,7 +54,10 @@ static void draw_active_profile_text(lv_obj_t *canvas, const struct status_state
 
 void draw_profile_status(lv_obj_t *canvas, const struct status_state *state) {
 #if !IS_ENABLED(CONFIG_NICE_EPAPER_ON)
-    draw_active_profile_text(canvas, state);
+    /* the profile number sits next to the 12 px BT icon; the USB / unbonded icons are wider */
+    if (state->selected_endpoint.transport == ZMK_TRANSPORT_BLE && state->active_profile_bonded) {
+        draw_active_profile_text(canvas, state);
+    }
 #endif // CONFIG_NICE_EPAPER_ON
 
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG) //  && IS_ENABLED(CONFIG_NICE_EPAPER_ON)

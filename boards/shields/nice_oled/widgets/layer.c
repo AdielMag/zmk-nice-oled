@@ -26,13 +26,12 @@ void draw_layer_status(lv_obj_t *canvas, const struct status_state *state) {
 #if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
     lv_canvas_draw_text(canvas, CONFIG_NICE_OLED_WIDGET_LAYER_CUSTOM_X, CONFIG_NICE_OLED_WIDGET_LAYER_CUSTOM_Y, 68, &label_dsc, text);
 #else
-    // 128x32 OLED: visible width is 32px. Mono fonts: 16 -> 8px/char, 12 -> 6px, 8 -> 4px.
-    // Pick the biggest font that fits the whole name, centred, bottom-aligned to the 16px slot.
+    // 128x32 OLED behind a case cutout: visible width is 22px. Mono fonts: 12 -> 6px/char,
+    // 8 -> 4px/char. Names are cut to 5 chars (5 * 4 = 20px), centred, bottom-aligned to a 16px slot.
+    text[5] = '\0';
     size_t len = strlen(text);
     int y = CONFIG_NICE_OLED_WIDGET_LAYER_CUSTOM_Y;
-    if (len <= 4) {
-        label_dsc.font = &pixel_operator_mono_16;
-    } else if (len <= 5) {
+    if (len <= 3) {
         label_dsc.font = &pixel_operator_mono_12;
         y += 3;
     } else {
@@ -40,6 +39,6 @@ void draw_layer_status(lv_obj_t *canvas, const struct status_state *state) {
         y += 6;
     }
     label_dsc.align = LV_TEXT_ALIGN_CENTER;
-    lv_canvas_draw_text(canvas, CONFIG_NICE_OLED_WIDGET_LAYER_CUSTOM_X, y, 32, &label_dsc, text);
+    lv_canvas_draw_text(canvas, CONFIG_NICE_OLED_WIDGET_LAYER_CUSTOM_X, y, 22, &label_dsc, text);
 #endif
 }

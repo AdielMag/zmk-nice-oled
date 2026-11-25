@@ -66,8 +66,8 @@ struct battery_state {
  * reserved battery level PERIPHERAL_CHARGING_LEVEL (zmk-config-sofle src/batt_charging.c).
  */
 #define PERIPHERAL_CHARGING_LEVEL 1
-#define BATT_BLOCK_Y0 54 // top of the left block
-#define BATT_BLOCK_H 30  // distance to the right block
+#define BATT_BLOCK_Y0 52 // top of the left block
+#define BATT_BLOCK_H 26  // distance to the right block (icon 12 + gap 2 + text 8 + 4)
 
 // 7x8 lightning bolt, drawn over the icon (inverted where the fill is)
 static const char *const batt_bolt[] = {
@@ -82,20 +82,21 @@ static void draw_battery_block(lv_obj_t *canvas, int y0, char side, uint8_t leve
 
     lv_draw_label_dsc_t letter_dsc, pct_dsc;
     init_label_dsc(&letter_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
-    init_label_dsc(&pct_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
+    init_label_dsc(&pct_dsc, LVGL_FOREGROUND, &pixel_operator_mono_8, LV_TEXT_ALIGN_LEFT);
 
     char letter[2] = {side, '\0'};
-    lv_canvas_draw_text(canvas, 0, y0 + 2, 8, &letter_dsc, letter);
+    /* usable width is 22 px: icon on top (21 px wide), "L 87%" line below */
+    lv_canvas_draw_text(canvas, 0, y0 + 14, 8, &letter_dsc, letter);
 
-    // icon: body 21x12 at x 9, terminal nub 2x4 at x 30
-    lv_canvas_draw_rect(canvas, 9, y0, 21, 12, &fg);
-    lv_canvas_draw_rect(canvas, 10, y0 + 1, 19, 10, &bg);
-    lv_canvas_draw_rect(canvas, 30, y0 + 4, 2, 4, &fg);
+    // icon: body 19x12 at x 0, terminal nub 2x4 at x 19
+    lv_canvas_draw_rect(canvas, 0, y0, 19, 12, &fg);
+    lv_canvas_draw_rect(canvas, 1, y0 + 1, 17, 10, &bg);
+    lv_canvas_draw_rect(canvas, 19, y0 + 4, 2, 4, &fg);
 
     if (level > 100) {
         level = 100;
     }
-    const int fill_x = 11, fill_w_max = 17, fill_y = y0 + 2, fill_h = 8;
+    const int fill_x = 2, fill_w_max = 15, fill_y = y0 + 2, fill_h = 8;
     const bool show_level = known && !charging;
     int fill_w = show_level ? (level * fill_w_max + 50) / 100 : 0;
     if (show_level && level > 0 && fill_w == 0) {
@@ -123,11 +124,11 @@ static void draw_battery_block(lv_obj_t *canvas, int y0, char side, uint8_t leve
     if (charging) {
         snprintf(text, sizeof(text), "CHG");
     } else if (known) {
-        snprintf(text, sizeof(text), "%d%%", level);
+        snprintf(text, sizeof(text), level >= 100 ? "%d" : "%d%%", level);
     } else {
         snprintf(text, sizeof(text), "--");
     }
-    lv_canvas_draw_text(canvas, 0, y0 + 14, 32, &pct_dsc, text);
+    lv_canvas_draw_text(canvas, 9, y0 + 14, 13, &pct_dsc, text);
 }
 
 static void draw_battery_text(lv_obj_t *canvas, const struct status_state *state) {
@@ -605,16 +606,16 @@ static void draw_hid_status(lv_obj_t *canvas, const struct status_state *state) 
                             CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y,
                             hid_area_width, &label_layout, layout_str);
 #else
-        // 16px font (8px/char). Centred alone; shifted left when the Caps Lock icon is shown.
-        label_layout.font = &pixel_operator_mono_16;
+        // 12px font (6px/char), 22 px usable width. Centred alone; left when the Caps Lock icon is shown.
+        label_layout.font = &pixel_operator_mono_12;
         label_layout.align = LV_TEXT_ALIGN_LEFT;
-        int lx = (32 - (int)strlen(layout_str) * 8) / 2;
+        int lx = (22 - (int)strlen(layout_str) * 6) / 2;
 #if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)
         if (state->caps_lock) {
-            lx = 2;
+            lx = 0;
         }
 #endif
-        lv_canvas_draw_text(canvas, lx, CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y, 32,
+        lv_canvas_draw_text(canvas, lx, CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y, 22,
                             &label_layout, layout_str);
 #endif
 #endif // CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT
@@ -823,10 +824,10 @@ static void draw_caps_icon(lv_obj_t *canvas, const struct status_state *state) {
     if (!state->caps_lock) {
         return;
     }
-    int x0 = 11; // centred when no language is shown
+    int x0 = 6; // centred (22 px wide) when no language is shown
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_RAW_HID) && IS_ENABLED(CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT)
     if (state->is_connected) {
-        x0 = 21; // to the right of the 2-letter language code
+        x0 = 13; // to the right of the 2-letter language code (12 px)
     }
 #endif
 #ifdef CONFIG_NICE_OLED_WIDGET_RAW_HID_LAYOUT_CUSTOM_Y
